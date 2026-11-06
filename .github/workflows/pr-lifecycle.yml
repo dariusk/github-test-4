@@ -1,5 +1,4 @@
 name: PR Triage and Lifecycle Automation
-
 on:
   pull_request:
     types: [opened, ready_for_review, labeled]
@@ -10,7 +9,7 @@ on:
 jobs:
   manage-pr:
     runs-on: ubuntu-latest
-		permissions:
+    permissions:
       contents: write
       pull-requests: write
       issues: write

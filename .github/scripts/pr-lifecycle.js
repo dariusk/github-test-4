@@ -19,10 +19,9 @@ module.exports = async ({ github, context, core }) => {
     if (pr.state !== 'open') continue;
 
     const prNumber = pr.number;
-    let body = pr.body || '';
     
-    // Parse metadata stored in a hidden HTML comment inside the PR body
-    let metadata = parseMetadata(body);
+    // Retrieve existing metadata and comment ID from dedicated bot comments
+    let { commentId, metadata } = await getBotComment(github, repo, prNumber);
 
     const now = new Date();
     let updated = false;
@@ -72,6 +71,9 @@ module.exports = async ({ github, context, core }) => {
           issue_number: prNumber,
           labels: ['comment-open'],
         });
+
+        // Remove needs-class label when comment-open is added
+        await removeNeedsClass(github, repo, prNumber);
         
         await github.rest.issues.createComment({
           owner: repo.owner,
@@ -91,6 +93,9 @@ module.exports = async ({ github, context, core }) => {
           issue_number: prNumber,
           labels: ['comment-open'],
         });
+
+        // Remove needs-class label when comment-open is added
+        await removeNeedsClass(github, repo, prNumber);
 
         await github.rest.issues.createComment({
           owner: repo.owner,
@@ -138,6 +143,9 @@ module.exports = async ({ github, context, core }) => {
           labels: ['comment-open'],
         });
 
+        // Remove needs-class label when comment-open is re-added
+        await removeNeedsClass(github, repo, prNumber);
+
         await github.rest.issues.createComment({
           owner: repo.owner,
           repo: repo.repo,
@@ -149,7 +157,6 @@ module.exports = async ({ github, context, core }) => {
     }
 
     // --- CRON / TIMER CHECKS (Rules 3.5, 6, 7) ---
-    // Uses window-based checks (<= now) to safely handle 5-minute cron intervals
     if (metadata.commentPeriodEnd && new Date(metadata.commentPeriodEnd) <= now) {
       // Rule 3.5: Comment Period timer is done, remove comment-open label[cite: 2]
       await github.rest.issues.createComment({
@@ -186,7 +193,6 @@ module.exports = async ({ github, context, core }) => {
       }
 
       // Check for 10-minute warning reminder and label (Rule 6)[cite: 2]
-      // Triggered safely if current time has reached or passed the 10-minute mark before staleEnd
       const tenMinutesBeforeStale = new Date(staleEnd.getTime() - 10 * 60 * 1000);
       if (!metadata.warnedStale && now >= tenMinutesBeforeStale && now < staleEnd) {
         await github.rest.issues.addLabels({
@@ -224,35 +230,74 @@ module.exports = async ({ github, context, core }) => {
       }
     }
 
-    // Update PR body with modified metadata if changes occurred
-    if (updated) {
-      const newBody = updateMetadataInBody(body, metadata);
-      await github.rest.pulls.update({
-        owner: repo.owner,
-        repo: repo.repo,
-       pull_number: prNumber,
-        body: newBody,
-      });
+    // Upsert/Update the dedicated bot state comment if tracking has started or changes occurred
+    if (metadata.staleTimerEnd || metadata.commentPeriodEnd || metadata.postResolutionTimerEnd || updated) {
+      commentId = await upsertBotComment(github, repo, prNumber, commentId, metadata);
     }
   }
 };
 
-function parseMetadata(body) {
-  const match = body.match(/<!-- pr-lifecycle: (.*?) -->/);
-  if (match && match[1]) {
-    try {
-      return JSON.parse(match[1]);
-    } catch (e) {
-      return {};
-    }
+// Helper: Safely remove the needs-class label
+async function removeNeedsClass(github, repo, prNumber) {
+  try {
+    await github.rest.issues.removeLabel({
+      owner: repo.owner,
+      repo: repo.repo,
+      issue_number: prNumber,
+      name: 'needs-class',
+    });
+  } catch (e) {
+    // Ignore if the label wasn't attached
   }
-  return { staleTimerEnd: null, commentPeriodEnd: null, postResolutionTimerEnd: null, warnedStale: false };
 }
 
-function updateMetadataInBody(body, metadata) {
-  const commentString = `<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
-  if (body.includes('<!-- pr-lifecycle:')) {
-    return body.replace(/<!-- pr-lifecycle:.*?-->/, commentString);
+// Helper: Scan comments to find the one containing our hidden tracking signature
+async function getBotComment(github, repo, prNumber) {
+  const { data: comments } = await github.rest.issues.listComments({
+    owner: repo.owner,
+    repo: repo.repo,
+    issue_number: prNumber,
+  });
+
+  for (const comment of comments) {
+    const match = comment.body.match(/<!-- pr-lifecycle: (.*?) -->/);
+    if (match && match[1]) {
+      try {
+        return {
+          commentId: comment.id,
+          metadata: JSON.parse(match[1]),
+        };
+      } catch (e) {
+        // Ignore malformed JSON
+      }
+    }
   }
-  return body + '\n\n' + commentString;
+
+  return {
+    commentId: null,
+    metadata: { staleTimerEnd: null, commentPeriodEnd: null, postResolutionTimerEnd: null, warnedStale: false },
+  };
+}
+
+// Helper: Create the bot state comment if it doesn't exist, or update it if it does
+async function upsertBotComment(github, repo, prNumber, commentId, metadata) {
+  const commentBody = `🤖 *PR Lifecycle Automation State*\n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
+
+  if (commentId) {
+    await github.rest.issues.updateComment({
+      owner: repo.owner,
+      repo: repo.repo,
+      comment_id: commentId,
+      body: commentBody,
+    });
+    return commentId;
+  } else {
+    const { data: newComment } = await github.rest.issues.createComment({
+      owner: repo.owner,
+      repo: repo.repo,
+      issue_number: prNumber,
+      body: commentBody,
+    });
+    return newComment.id;
+  }
 }
