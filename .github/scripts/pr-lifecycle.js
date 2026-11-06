@@ -29,12 +29,12 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Opened or Ready for Review ---
     if (context.eventName === 'pull_request' && ['opened', 'ready_for_review'].includes(context.payload.action)) {
       if (context.payload.action === 'opened' && pr.draft) {
-        // Rule 1: Does NOT apply to a Draft PR
+        // Rule 1: Does NOT apply to a Draft PR[cite: 2]
         continue;
       }
       
       if (!metadata.staleTimerEnd) {
-        // Rule 1: Every new PR gets a `needs-class` tag and a 60-minute Stale PR timer
+        // Rule 1: Every new PR gets a `needs-class` tag and a 60-minute Stale PR timer[cite: 2]
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
@@ -61,7 +61,7 @@ module.exports = async ({ github, context, core }) => {
       const labelName = context.payload.label.name;
 
       if (['class-1', 'class-2'].includes(labelName)) {
-        // Rule 2: 15-minute Comment Period timer + comment-open label
+        // Rule 2: 15-minute Comment Period timer + comment-open label[cite: 2]
         const commentEnd = new Date(now.getTime() + 15 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -71,6 +71,9 @@ module.exports = async ({ github, context, core }) => {
           issue_number: prNumber,
           labels: ['comment-open'],
         });
+
+        // Remove needs-class label when comment-open is added
+        await removeNeedsClass(github, repo, prNumber);
         
         await github.rest.issues.createComment({
           owner: repo.owner,
@@ -80,7 +83,7 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (['class-3', 'class-4'].includes(labelName)) {
-        // Rule 3: 30-minute Comment Period timer + comment-open label
+        // Rule 3: 30-minute Comment Period timer + comment-open label[cite: 2]
         const commentEnd = new Date(now.getTime() + 30 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -91,6 +94,9 @@ module.exports = async ({ github, context, core }) => {
           labels: ['comment-open'],
         });
 
+        // Remove needs-class label when comment-open is added
+        await removeNeedsClass(github, repo, prNumber);
+
         await github.rest.issues.createComment({
           owner: repo.owner,
           repo: repo.repo,
@@ -99,7 +105,7 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (labelName === 'objection-open') {
-        // Rule 4: Stop comment period timer, add comment-paused label
+        // Rule 4: Stop comment period timer, add comment-paused label[cite: 2]
         metadata.commentPeriodEnd = null;
 
         await github.rest.issues.addLabels({
@@ -117,7 +123,7 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (labelName === 'objection-resolved') {
-        // Rule 5: 15-minute Post Resolution timer, update labels
+        // Rule 5: 15-minute Post Resolution timer, update labels[cite: 2]
         const postResEnd = new Date(now.getTime() + 15 * 60 * 1000);
         metadata.postResolutionTimerEnd = postResEnd.toISOString();
 
@@ -137,6 +143,9 @@ module.exports = async ({ github, context, core }) => {
           labels: ['comment-open'],
         });
 
+        // Remove needs-class label when comment-open is re-added
+        await removeNeedsClass(github, repo, prNumber);
+
         await github.rest.issues.createComment({
           owner: repo.owner,
           repo: repo.repo,
@@ -149,7 +158,7 @@ module.exports = async ({ github, context, core }) => {
 
     // --- CRON / TIMER CHECKS (Rules 3.5, 6, 7) ---
     if (metadata.commentPeriodEnd && new Date(metadata.commentPeriodEnd) <= now) {
-      // Rule 3.5: Comment Period timer is done, remove comment-open label
+      // Rule 3.5: Comment Period timer is done, remove comment-open label[cite: 2]
       await github.rest.issues.createComment({
         owner: repo.owner,
         repo: repo.repo,
@@ -183,7 +192,7 @@ module.exports = async ({ github, context, core }) => {
         }
       }
 
-      // Check for 10-minute warning reminder and label (Rule 6)
+      // Check for 10-minute warning reminder and label (Rule 6)[cite: 2]
       const tenMinutesBeforeStale = new Date(staleEnd.getTime() - 10 * 60 * 1000);
       if (!metadata.warnedStale && now >= tenMinutesBeforeStale && now < staleEnd) {
         await github.rest.issues.addLabels({
@@ -203,7 +212,7 @@ module.exports = async ({ github, context, core }) => {
         updated = true;
       }
 
-      // Rule 7: When Stale PR timer is done (or passed), close the PR
+      // Rule 7: When Stale PR timer is done (or passed), close the PR[cite: 2]
       if (now >= staleEnd) {
         await github.rest.issues.createComment({
           owner: repo.owner,
@@ -227,6 +236,20 @@ module.exports = async ({ github, context, core }) => {
     }
   }
 };
+
+// Helper: Safely remove the needs-class label
+async function removeNeedsClass(github, repo, prNumber) {
+  try {
+    await github.rest.issues.removeLabel({
+      owner: repo.owner,
+      repo: repo.repo,
+      issue_number: prNumber,
+      name: 'needs-class',
+    });
+  } catch (e) {
+    // Ignore if the label wasn't attached
+  }
+}
 
 // Helper: Scan comments to find the one containing our hidden tracking signature
 async function getBotComment(github, repo, prNumber) {
