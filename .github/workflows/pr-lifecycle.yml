@@ -4,13 +4,16 @@ on:
   pull_request:
     types: [opened, ready_for_review, labeled]
   schedule:
-    - cron: '*/5 * * * *' # Runs every ~5 minutes (accommodating GitHub Actions cron scheduling behavior)
+    - cron: '*/5 * * * *' # Runs every ~5 minutes
   workflow_dispatch:
 
 jobs:
   manage-pr:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
       - name: Run PR Lifecycle and Triage Logic
         uses: actions/github-script@v7
         with:
