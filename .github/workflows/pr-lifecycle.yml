@@ -10,7 +10,7 @@ on:
 jobs:
   manage-pr:
     runs-on: ubuntu-latest
-		permissions:
+    permissions:
       contents: write
       pull-requests: write
       issues: write
