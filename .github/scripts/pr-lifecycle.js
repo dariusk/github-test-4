@@ -18,6 +18,9 @@ module.exports = async ({ github, context, core }) => {
   for (const pr of prs) {
     if (pr.state !== 'open') continue;
 
+    // Skip if the PR is in a draft state
+    if (pr.draft) continue;
+
     const prNumber = pr.number;
     
     // Retrieve existing metadata and comment ID from dedicated bot comments
@@ -28,11 +31,6 @@ module.exports = async ({ github, context, core }) => {
 
     // --- EVENT: PR Opened or Ready for Review ---
     if (context.eventName === 'pull_request' && ['opened', 'ready_for_review'].includes(context.payload.action)) {
-      if (context.payload.action === 'opened' && pr.draft) {
-        // Does NOT apply to a Draft PR
-        continue;
-      }
-      
       if (context.payload.action === 'ready_for_review' || !metadata.staleTimerEnd) {
         // Every new PR or newly ready PR gets a `needs-class` tag and a 60-minute Stale PR timer
         await github.rest.issues.addLabels({
