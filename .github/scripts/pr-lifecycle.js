@@ -33,8 +33,8 @@ module.exports = async ({ github, context, core }) => {
         continue;
       }
       
-      if (!metadata.staleTimerEnd) {
-        // Every new PR gets a `needs-class` tag and a 60-minute Stale PR timer
+      if (context.payload.action === 'ready_for_review' || !metadata.staleTimerEnd) {
+        // Every new PR or newly ready PR gets a `needs-class` tag and a 60-minute Stale PR timer
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
@@ -46,11 +46,15 @@ module.exports = async ({ github, context, core }) => {
         metadata.staleTimerEnd = staleEnd.toISOString();
         metadata.warnedStale = false;
 
+        const actionText = context.payload.action === 'ready_for_review'
+          ? 'PR marked as ready for review. The 60-minute Stale PR timer has been reset and'
+          : 'A 60-minute Stale PR timer has begun and';
+
         await github.rest.issues.createComment({
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `A 60-minute Stale PR timer has begun and is set to end on ${staleEnd.toUTCString()}.
+          body: `${actionText} is set to end on ${staleEnd.toUTCString()}.
 
 (This bot is here to assist in managing the [Social Web Working Group publishing rules](https://github.com/w3c/socialwg/blob/main/governance/publication-workflow.md) for comment periods and objections.)`,
         });
