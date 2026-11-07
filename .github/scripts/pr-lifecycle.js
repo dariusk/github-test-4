@@ -143,7 +143,7 @@ module.exports = async ({ github, context, core }) => {
             owner: repo.owner,
             repo: repo.repo,
             issue_number: prNumber,
-            name: 'objection-open',
+            name: 'objections-open',
           });
         } catch (e) { /* ignore if label wasn't present */ }
 
