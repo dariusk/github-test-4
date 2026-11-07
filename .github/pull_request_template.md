@@ -3,3 +3,5 @@ By submitting a PR to this repo, you will trigger the Social Web Working Group's
 Please read the specific rules at: https://github.com/w3c/socialwg/blob/main/governance/publication-workflow.md
 
 If this is a PR meant for discussion but not for immediate triggering of our publication process, please open the PR as a Draft (click the arrow next to the Create Pull Request button and select Create Draft Pull Request). This will prevent our administration timers from starting and signal to the Working Group that this PR is, for now, intended only for discussion and consensus-gathering.
+
+Now please delete all this text and write your PR description. Thank you!
