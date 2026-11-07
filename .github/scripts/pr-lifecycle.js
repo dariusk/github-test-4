@@ -50,7 +50,9 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: 'A 60-minute Stale PR timer has begun.',
+          body: `A 60-minute Stale PR timer has begun and is set to end on ${staleEnd.toUTCString()}.
+
+(This bot is here to assist in managing the [Social Web Working Group publishing rules](https://github.com/w3c/socialwg/blob/main/governance/publication-workflow.md) for comment periods and objections.)`,
         });
         updated = true;
       }
@@ -163,7 +165,7 @@ module.exports = async ({ github, context, core }) => {
         owner: repo.owner,
         repo: repo.repo,
         issue_number: prNumber,
-        body: 'The comment period is now over.',
+        body: 'The comment period is now over. WG Chair is expected to evaluate whether this should be merged or closed based on the [Social Web Working Group publishing rules](https://github.com/w3c/socialwg/blob/main/governance/publication-workflow.md).',
       });
 
       try {
@@ -172,6 +174,15 @@ module.exports = async ({ github, context, core }) => {
           repo: repo.repo,
           issue_number: prNumber,
           name: 'comment-open',
+        });
+      } catch (e) { /* ignore */ }
+
+      try {
+        await github.rest.issues.addLabels({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          labels: ['comment-closed'],
         });
       } catch (e) { /* ignore */ }
 
@@ -281,7 +292,7 @@ async function getBotComment(github, repo, prNumber) {
 
 // Helper: Create the bot state comment if it doesn't exist, or update it if it does
 async function upsertBotComment(github, repo, prNumber, commentId, metadata) {
-  const commentBody = `🤖 *PR Lifecycle Automation State*\n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
+  const commentBody = `🤖 *PR Lifecycle Automation State*, do not delete or edit! \n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
 
   if (commentId) {
     await github.rest.issues.updateComment({
