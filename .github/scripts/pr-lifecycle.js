@@ -61,6 +61,7 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Labelled ---
     if (context.eventName === 'pull_request' && context.payload.action === 'labeled') {
       const labelName = context.payload.label.name;
+      const sender = context.payload.sender ? context.payload.sender.login : 'Someone';
 
       if (['class-1', 'class-2'].includes(labelName)) {
         // Rule 2: 15-minute Comment Period timer + comment-open label[cite: 2]
@@ -121,7 +122,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: 'At least one objection has been noted and the Comment Period timer has stopped.',
+          body: `@${sender} has noted an objection, so the Comment Period timer has stopped.`,
         });
         updated = true;
       } else if (labelName === 'objections-resolved') {
@@ -161,7 +162,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `All objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
+          body: `@${sender} has noted that all open objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
         });
         updated = true;
       }
@@ -224,7 +225,7 @@ module.exports = async ({ github, context, core }) => {
           issue_number: prNumber,
           labels: ['comment-closed'],
         });
-      } catch (e) { /* ignore */ }
+      } catch (e)  /* ignore */ }
 
       metadata.postResolutionTimerEnd = null;
       updated = true;
