@@ -332,7 +332,7 @@ async function getBotComment(github, repo, prNumber) {
 
 // Helper: Create the bot state comment if it doesn't exist, or update it if it does
 async function upsertBotComment(github, repo, prNumber, commentId, metadata) {
-  const commentBody = `🤖 *PR Lifecycle Automation State*, do not delete or edit! \n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
+  const commentBody = `🤖 This comment stores our helper bot's *PR Lifecycle Automation State*, do not delete or edit! \n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
 
   if (commentId) {
     await github.rest.issues.updateComment({
