@@ -29,12 +29,12 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Opened or Ready for Review ---
     if (context.eventName === 'pull_request' && ['opened', 'ready_for_review'].includes(context.payload.action)) {
       if (context.payload.action === 'opened' && pr.draft) {
-        // Rule 1: Does NOT apply to a Draft PR[cite: 2]
+        // Does NOT apply to a Draft PR
         continue;
       }
       
       if (!metadata.staleTimerEnd) {
-        // Rule 1: Every new PR gets a `needs-class` tag and a 60-minute Stale PR timer[cite: 2]
+        // Every new PR gets a `needs-class` tag and a 60-minute Stale PR timer
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
@@ -61,9 +61,10 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Labelled ---
     if (context.eventName === 'pull_request' && context.payload.action === 'labeled') {
       const labelName = context.payload.label.name;
+      const sender = context.payload.sender ? context.payload.sender.login : 'Someone';
 
       if (['class-1', 'class-2'].includes(labelName)) {
-        // Rule 2: 15-minute Comment Period timer + comment-open label[cite: 2]
+        // 15-minute Comment Period timer + comment-open label
         const commentEnd = new Date(now.getTime() + 15 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -85,7 +86,7 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (['class-3', 'class-4'].includes(labelName)) {
-        // Rule 3: 30-minute Comment Period timer + comment-open label[cite: 2]
+        // 30-minute Comment Period timer + comment-open label
         const commentEnd = new Date(now.getTime() + 30 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -107,7 +108,7 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (labelName === 'objections-open') {
-        // Rule 4: Stop comment period timer, add comment-paused label[cite: 2]
+        // Stop comment period timer, add comment-paused label
         metadata.commentPeriodEnd = null;
 
         await github.rest.issues.addLabels({
@@ -117,15 +118,22 @@ module.exports = async ({ github, context, core }) => {
           labels: ['comment-paused'],
         });
 
+        await github.rest.issues.removeLabel({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          name: 'comment-open',
+        });
+
         await github.rest.issues.createComment({
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: 'At least one objection has been noted and the Comment Period timer has stopped.',
+          body: `@${sender} has noted an objection, so the Comment Period timer has stopped.`,
         });
         updated = true;
       } else if (labelName === 'objections-resolved') {
-        // Rule 5: 15-minute Post Resolution timer, update labels[cite: 2]
+        // 15-minute Post Resolution timer, update labels
         const postResEnd = new Date(now.getTime() + 15 * 60 * 1000);
         metadata.postResolutionTimerEnd = postResEnd.toISOString();
 
@@ -161,15 +169,15 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `All objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
+          body: `@${sender} has noted that all open objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
         });
         updated = true;
       }
     }
 
-    // --- CRON / TIMER CHECKS (Rules 3.5, 6, 7) ---
+    // --- CRON / TIMER CHECKS ---
     if (metadata.commentPeriodEnd && new Date(metadata.commentPeriodEnd) <= now) {
-      // Rule 3.5: Comment Period timer is done, remove comment-open label[cite: 2]
+      // Comment Period timer is done, remove comment-open label
       await github.rest.issues.createComment({
         owner: repo.owner,
         repo: repo.repo,
@@ -205,7 +213,7 @@ module.exports = async ({ github, context, core }) => {
         owner: repo.owner,
         repo: repo.repo,
         issue_number: prNumber,
-        body: 'The post-resolution comment period is now over.',
+        body: 'The post-resolution comment period is now over. WG Chair is expected to evaluate whether this should be merged or closed based on the [Social Web Working Group publishing rules](https://github.com/w3c/socialwg/blob/main/governance/publication-workflow.md).',
       });
 
       try {
@@ -233,7 +241,7 @@ module.exports = async ({ github, context, core }) => {
     if (metadata.staleTimerEnd) {
       let staleEnd = new Date(metadata.staleTimerEnd);
       
-      // Rule 6 Extension Adjustment Logic (Minute-based)
+      // Extension Adjustment Logic (Minute-based)
       if (metadata.postResolutionTimerEnd) {
         const postResEnd = new Date(metadata.postResolutionTimerEnd);
         if (postResEnd > staleEnd) {
@@ -243,7 +251,7 @@ module.exports = async ({ github, context, core }) => {
         }
       }
 
-      // Check for 10-minute warning reminder and label (Rule 6)[cite: 2]
+      // Check for 10-minute warning reminder and label
       const tenMinutesBeforeStale = new Date(staleEnd.getTime() - 10 * 60 * 1000);
       if (!metadata.warnedStale && now >= tenMinutesBeforeStale && now < staleEnd) {
         await github.rest.issues.addLabels({
@@ -263,7 +271,7 @@ module.exports = async ({ github, context, core }) => {
         updated = true;
       }
 
-      // Rule 7: When Stale PR timer is done (or passed), close the PR[cite: 2]
+      // When Stale PR timer is done (or passed), close the PR
       if (now >= staleEnd) {
         await github.rest.issues.createComment({
           owner: repo.owner,
