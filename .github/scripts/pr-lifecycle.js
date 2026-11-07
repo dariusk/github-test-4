@@ -121,7 +121,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: 'An objection has been noted and the Comment Period timer has stopped.',
+          body: 'At least one objection has been noted and the Comment Period timer has stopped.',
         });
         updated = true;
       } else if (labelName === 'objections-resolved') {
@@ -161,7 +161,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `An objection has been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
+          body: `All objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
         });
         updated = true;
       }
