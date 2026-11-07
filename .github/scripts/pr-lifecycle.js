@@ -225,7 +225,7 @@ module.exports = async ({ github, context, core }) => {
           issue_number: prNumber,
           labels: ['comment-closed'],
         });
-      } catch (e)  /* ignore */ }
+      } { catch (e)  /* ignore */ }
 
       metadata.postResolutionTimerEnd = null;
       updated = true;
