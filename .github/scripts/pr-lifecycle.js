@@ -199,6 +199,37 @@ module.exports = async ({ github, context, core }) => {
       updated = true;
     }
 
+    // Post Resolution Timer Expiration
+    if (metadata.postResolutionTimerEnd && new Date(metadata.postResolutionTimerEnd) <= now) {
+      await github.rest.issues.createComment({
+        owner: repo.owner,
+        repo: repo.repo,
+        issue_number: prNumber,
+        body: 'The post-resolution comment period is now over.',
+      });
+
+      try {
+        await github.rest.issues.removeLabel({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          name: 'comment-open',
+        });
+      } catch (e) { /* ignore */ }
+
+      try {
+        await github.rest.issues.addLabels({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          labels: ['comment-closed'],
+        });
+      } catch (e) { /* ignore */ }
+
+      metadata.postResolutionTimerEnd = null;
+      updated = true;
+    }
+
     if (metadata.staleTimerEnd) {
       let staleEnd = new Date(metadata.staleTimerEnd);
       
@@ -301,7 +332,7 @@ async function getBotComment(github, repo, prNumber) {
 
 // Helper: Create the bot state comment if it doesn't exist, or update it if it does
 async function upsertBotComment(github, repo, prNumber, commentId, metadata) {
-  const commentBody = `🤖 *PR Lifecycle Automation State*, do not delete or edit! \n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
+  const commentBody = `🤖 This comment stores our helper bot's *PR Lifecycle Automation State*, do not delete or edit! \n<!-- pr-lifecycle: ${JSON.stringify(metadata)} -->`;
 
   if (commentId) {
     await github.rest.issues.updateComment({
