@@ -199,6 +199,37 @@ module.exports = async ({ github, context, core }) => {
       updated = true;
     }
 
+    // Post Resolution Timer Expiration
+    if (metadata.postResolutionTimerEnd && new Date(metadata.postResolutionTimerEnd) <= now) {
+      await github.rest.issues.createComment({
+        owner: repo.owner,
+        repo: repo.repo,
+        issue_number: prNumber,
+        body: 'The post-resolution comment period is now over.',
+      });
+
+      try {
+        await github.rest.issues.removeLabel({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          name: 'comment-open',
+        });
+      } catch (e) { /* ignore */ }
+
+      try {
+        await github.rest.issues.addLabels({
+          owner: repo.owner,
+          repo: repo.repo,
+          issue_number: prNumber,
+          labels: ['comment-closed'],
+        });
+      } catch (e) { /* ignore */ }
+
+      metadata.postResolutionTimerEnd = null;
+      updated = true;
+    }
+
     if (metadata.staleTimerEnd) {
       let staleEnd = new Date(metadata.staleTimerEnd);
       
