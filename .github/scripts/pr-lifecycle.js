@@ -106,7 +106,7 @@ module.exports = async ({ github, context, core }) => {
           body: `A 30 minute comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
         });
         updated = true;
-      } else if (labelName === 'objection-open') {
+      } else if (labelName === 'objections-open') {
         // Rule 4: Stop comment period timer, add comment-paused label[cite: 2]
         metadata.commentPeriodEnd = null;
 
@@ -124,7 +124,7 @@ module.exports = async ({ github, context, core }) => {
           body: 'An objection has been noted and the Comment Period timer has stopped.',
         });
         updated = true;
-      } else if (labelName === 'objection-resolved') {
+      } else if (labelName === 'objections-resolved') {
         // Rule 5: 15-minute Post Resolution timer, update labels[cite: 2]
         const postResEnd = new Date(now.getTime() + 15 * 60 * 1000);
         metadata.postResolutionTimerEnd = postResEnd.toISOString();
@@ -135,6 +135,15 @@ module.exports = async ({ github, context, core }) => {
             repo: repo.repo,
             issue_number: prNumber,
             name: 'comment-paused',
+          });
+        } catch (e) { /* ignore if label wasn't present */ }
+
+        try {
+          await github.rest.issues.removeLabel({
+            owner: repo.owner,
+            repo: repo.repo,
+            issue_number: prNumber,
+            name: 'objection-open',
           });
         } catch (e) { /* ignore if label wasn't present */ }
 
