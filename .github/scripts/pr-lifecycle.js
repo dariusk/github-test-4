@@ -32,7 +32,7 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Opened or Ready for Review ---
     if (context.eventName === 'pull_request' && ['opened', 'ready_for_review'].includes(context.payload.action)) {
       if (context.payload.action === 'ready_for_review' || !metadata.staleTimerEnd) {
-        // Every new PR or newly ready PR gets a `needs-class` tag and a 60-minute Stale PR timer
+        // Every new PR or newly ready PR gets a `needs-class` tag and a 28-day Stale PR timer
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
@@ -40,13 +40,13 @@ module.exports = async ({ github, context, core }) => {
           labels: ['needs-class'],
         });
 
-        const staleEnd = new Date(now.getTime() + 60 * 60 * 1000);
+        const staleEnd = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
         metadata.staleTimerEnd = staleEnd.toISOString();
         metadata.warnedStale = false;
 
         const actionText = context.payload.action === 'ready_for_review'
-          ? 'PR marked as ready for review. The 60-minute Stale PR timer has been reset and'
-          : 'A 60-minute Stale PR timer has begun and';
+          ? 'PR marked as ready for review. The 28-day Stale PR timer has been reset and'
+          : 'A 28-day Stale PR timer has begun and';
 
         await github.rest.issues.createComment({
           owner: repo.owner,
@@ -66,8 +66,8 @@ module.exports = async ({ github, context, core }) => {
       const sender = context.payload.sender ? context.payload.sender.login : 'Someone';
 
       if (['class-1', 'class-2'].includes(labelName)) {
-        // 15-minute Comment Period timer + comment-open label
-        const commentEnd = new Date(now.getTime() + 15 * 60 * 1000);
+        // 7-day Comment Period timer + comment-open label
+        const commentEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
         await github.rest.issues.addLabels({
@@ -84,12 +84,12 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `A 15 minute comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
+          body: `A 7-day comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
         });
         updated = true;
       } else if (['class-3', 'class-4'].includes(labelName)) {
-        // 30-minute Comment Period timer + comment-open label
-        const commentEnd = new Date(now.getTime() + 30 * 60 * 1000);
+        // 14-day Comment Period timer + comment-open label
+        const commentEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
         await github.rest.issues.addLabels({
@@ -106,7 +106,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `A 30 minute comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
+          body: `A 14-day comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
         });
         updated = true;
       } else if (labelName === 'objections-open') {
@@ -135,8 +135,8 @@ module.exports = async ({ github, context, core }) => {
         });
         updated = true;
       } else if (labelName === 'objections-resolved') {
-        // 15-minute Post Resolution timer, update labels
-        const postResEnd = new Date(now.getTime() + 15 * 60 * 1000);
+        // 7-day Post Resolution timer, update labels
+        const postResEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         metadata.postResolutionTimerEnd = postResEnd.toISOString();
 
         try {
@@ -171,7 +171,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `@${sender} has noted that all open objections have been resolved and a 15-minute Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
+          body: `@${sender} has noted that all open objections have been resolved and a 7-day Post Resolution timer for further comment has started, set to end on ${postResEnd.toUTCString()}.`,
         });
         updated = true;
       }
@@ -253,9 +253,9 @@ module.exports = async ({ github, context, core }) => {
         }
       }
 
-      // Check for 10-minute warning reminder and label
-      const tenMinutesBeforeStale = new Date(staleEnd.getTime() - 10 * 60 * 1000);
-      if (!metadata.warnedStale && now >= tenMinutesBeforeStale && now < staleEnd) {
+      // Check for 3-day warning reminder and label
+      const threeDaysBeforeStale = new Date(staleEnd.getTime() - 3 * 24 * 60 * 60 * 1000);
+      if (!metadata.warnedStale && now >= threeDaysBeforeStale && now < staleEnd) {
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
@@ -267,7 +267,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          body: `Reminder: This issue will close in ten minutes if not merged (impending closure scheduled for ${staleEnd.toUTCString()}).`,
+          body: `Reminder: This issue will close in three days if not merged (impending closure scheduled for ${staleEnd.toUTCString()}).`,
         });
         metadata.warnedStale = true;
         updated = true;
