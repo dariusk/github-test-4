@@ -32,12 +32,12 @@ module.exports = async ({ github, context, core }) => {
     // --- EVENT: PR Opened or Ready for Review ---
     if (context.eventName === 'pull_request' && ['opened', 'ready_for_review'].includes(context.payload.action)) {
       if (context.payload.action === 'ready_for_review' || !metadata.staleTimerEnd) {
-        // Every new PR or newly ready PR gets a `needs-class` tag and a 28-day Stale PR timer
+        // Every new PR or newly ready PR gets a `WD-needs-class` tag and a 28-day Stale PR timer
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['needs-class'],
+          labels: ['WD-needs-class'],
         });
 
         const staleEnd = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
@@ -65,8 +65,8 @@ module.exports = async ({ github, context, core }) => {
       const labelName = context.payload.label.name;
       const sender = context.payload.sender ? context.payload.sender.login : 'Someone';
 
-      if (['class-1', 'class-2'].includes(labelName)) {
-        // 7-day Comment Period timer + comment-open label
+      if (['WD-class-1', 'WD-class-2'].includes(labelName)) {
+        // 7-day Comment Period timer + WD-comment-open label
         const commentEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -74,10 +74,10 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-open'],
+          labels: ['WD-comment-open'],
         });
 
-        // Remove needs-class label when comment-open is added
+        // Remove WD-needs-class label when WD-comment-open is added
         await removeNeedsClass(github, repo, prNumber);
         
         await github.rest.issues.createComment({
@@ -87,8 +87,8 @@ module.exports = async ({ github, context, core }) => {
           body: `A 7-day comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
         });
         updated = true;
-      } else if (['class-3', 'class-4'].includes(labelName)) {
-        // 14-day Comment Period timer + comment-open label
+      } else if (['WD-class-3', 'WD-class-4'].includes(labelName)) {
+        // 14-day Comment Period timer + WD-comment-open label
         const commentEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
         metadata.commentPeriodEnd = commentEnd.toISOString();
 
@@ -96,10 +96,10 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-open'],
+          labels: ['WD-comment-open'],
         });
 
-        // Remove needs-class label when comment-open is added
+        // Remove WD-needs-class label when WD-comment-open is added
         await removeNeedsClass(github, repo, prNumber);
 
         await github.rest.issues.createComment({
@@ -109,22 +109,22 @@ module.exports = async ({ github, context, core }) => {
           body: `A 14-day comment window has begun and is set to end on ${commentEnd.toUTCString()}.`,
         });
         updated = true;
-      } else if (labelName === 'objections-open') {
-        // Stop comment period timer, add comment-paused label
+      } else if (labelName === 'WD-objections-open') {
+        // Stop comment period timer, add WD-comment-paused label
         metadata.commentPeriodEnd = null;
 
         await github.rest.issues.addLabels({
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-paused'],
+          labels: ['WD-comment-paused'],
         });
 
         await github.rest.issues.removeLabel({
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          name: 'comment-open',
+          name: 'WD-comment-open',
         });
 
         await github.rest.issues.createComment({
@@ -134,7 +134,7 @@ module.exports = async ({ github, context, core }) => {
           body: `@${sender} has noted an objection, so the Comment Period timer has stopped.`,
         });
         updated = true;
-      } else if (labelName === 'objections-resolved') {
+      } else if (labelName === 'WD-objections-resolved') {
         // 7-day Post Resolution timer, update labels
         const postResEnd = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
         metadata.postResolutionTimerEnd = postResEnd.toISOString();
@@ -144,7 +144,7 @@ module.exports = async ({ github, context, core }) => {
             owner: repo.owner,
             repo: repo.repo,
             issue_number: prNumber,
-            name: 'comment-paused',
+            name: 'WD-comment-paused',
           });
         } catch (e) { /* ignore if label wasn't present */ }
 
@@ -153,7 +153,7 @@ module.exports = async ({ github, context, core }) => {
             owner: repo.owner,
             repo: repo.repo,
             issue_number: prNumber,
-            name: 'objections-open',
+            name: 'WD-objections-open',
           });
         } catch (e) { /* ignore if label wasn't present */ }
 
@@ -161,10 +161,10 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-open'],
+          labels: ['WD-comment-open'],
         });
 
-        // Remove needs-class label when comment-open is re-added
+        // Remove WD-needs-class label when WD-comment-open is re-added
         await removeNeedsClass(github, repo, prNumber);
 
         await github.rest.issues.createComment({
@@ -179,7 +179,7 @@ module.exports = async ({ github, context, core }) => {
 
     // --- CRON / TIMER CHECKS ---
     if (metadata.commentPeriodEnd && new Date(metadata.commentPeriodEnd) <= now) {
-      // Comment Period timer is done, remove comment-open label
+      // Comment Period timer is done, remove WD-comment-open label
       await github.rest.issues.createComment({
         owner: repo.owner,
         repo: repo.repo,
@@ -192,7 +192,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          name: 'comment-open',
+          name: 'WD-comment-open',
         });
       } catch (e) { /* ignore */ }
 
@@ -201,7 +201,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-closed'],
+          labels: ['WD-comment-closed'],
         });
       } catch (e) { /* ignore */ }
 
@@ -223,7 +223,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          name: 'comment-open',
+          name: 'WD-comment-open',
         });
       } catch (e) { /* ignore */ }
 
@@ -232,7 +232,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['comment-closed'],
+          labels: ['WD-comment-closed'],
         });
       } catch (e) { /* ignore */ }
 
@@ -260,7 +260,7 @@ module.exports = async ({ github, context, core }) => {
           owner: repo.owner,
           repo: repo.repo,
           issue_number: prNumber,
-          labels: ['closure-warning'],
+          labels: ['WD-closure-warning'],
         });
 
         await github.rest.issues.createComment({
@@ -298,14 +298,14 @@ module.exports = async ({ github, context, core }) => {
   }
 };
 
-// Helper: Safely remove the needs-class label
+// Helper: Safely remove the WD-needs-class label
 async function removeNeedsClass(github, repo, prNumber) {
   try {
     await github.rest.issues.removeLabel({
       owner: repo.owner,
       repo: repo.repo,
       issue_number: prNumber,
-      name: 'needs-class',
+      name: 'WD-needs-class',
     });
   } catch (e) {
     // Ignore if the label wasn't attached
